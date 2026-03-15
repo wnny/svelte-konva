@@ -4,13 +4,11 @@
   let container = $state<HTMLDivElement | null>(null);
   let currentColor = $state('#2563eb');
   let currentWidth = $state(5);
-  
-  // 🌟 [추가] 현재 선택된 도구 상태 ('pen' 또는 'eraser')
   let currentTool = $state<'pen' | 'eraser'>('pen');
   
   let stage: Konva.Stage;
-  let bgLayer: Konva.Layer;      // 배경 전용 레이어
-  let drawingLayer: Konva.Layer; // 그림 전용 레이어
+  let bgLayer: Konva.Layer;
+  let drawingLayer: Konva.Layer;
   let isDrawing = false;
   let currentLine: Konva.Line;
   let linesArray: Konva.Line[] = [];
@@ -24,26 +22,33 @@
       height: 600,
     });
     
-    // 🌟 1. 레이어 분리: 배경과 그림을 분리해야 지우개가 배경을 지우지 않습니다.
     bgLayer = new Konva.Layer();
     drawingLayer = new Konva.Layer();
-    
     stage.add(bgLayer);
     stage.add(drawingLayer);
 
-    // 하얀 배경을 깔아줍니다 (다운로드 시 투명 방지)
     const background = new Konva.Rect({
       x: 0, y: 0, width: stage.width(), height: stage.height(),
       fill: 'white', listening: false,
     });
     bgLayer.add(background);
 
+    // ✨ [핵심] 확대/축소된 캔버스 비율에 맞게 정확한 마우스 좌표를 계산하는 함수
+    function getRelativePointerPosition(stage: Konva.Stage) {
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return null;
+      const scale = stage.scaleX();
+      return {
+        x: (pointer.x - stage.x()) / scale,
+        y: (pointer.y - stage.y()) / scale
+      };
+    }
+
     stage.on('mousedown touchstart', () => {
       isDrawing = true;
-      const pos = stage.getPointerPosition();
+      const pos = getRelativePointerPosition(stage); // ✨ 비율이 적용된 좌표 사용
       if (!pos) return;
 
-      // 🌟 2. 진짜 지우개 로직: currentTool이 'eraser'일 때 destination-out 적용
       currentLine = new Konva.Line({
         stroke: currentColor,
         strokeWidth: currentWidth,
@@ -62,16 +67,48 @@
       if (!isDrawing) return;
       e.evt.preventDefault();
       
-      const pos = stage.getPointerPosition();
+      const pos = getRelativePointerPosition(stage); // ✨ 비율이 적용된 좌표 사용
       if (!pos) return;
 
       const newPoints = currentLine.points().concat([pos.x, pos.y]);
       currentLine.points(newPoints);
-      drawingLayer.batchDraw(); // 그림 레이어만 업데이트
+      drawingLayer.batchDraw();
     });
 
     stage.on('mouseup touchend', () => {
       isDrawing = false;
+    });
+
+    // ✨ [추가] 마우스 휠을 이용한 확대/축소 (Zoom in/out) 기능
+    stage.on('wheel', (e) => {
+      e.evt.preventDefault(); // 페이지 스크롤 방지
+      const scaleBy = 1.1; // 한 번 휠을 굴릴 때 커지는 비율
+      const oldScale = stage.scaleX();
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return;
+
+      // 마우스가 위치한 곳을 기준으로 확대/축소 중심점 계산
+      const mousePointTo = {
+        x: (pointer.x - stage.x()) / oldScale,
+        y: (pointer.y - stage.y()) / oldScale,
+      };
+
+      // 휠을 위로 올리면 확대, 아래로 내리면 축소
+      const newScale = e.evt.deltaY < 0 ? oldScale * scaleBy : oldScale / scaleBy;
+      
+      // 너무 과도하게 축소되거나 확대되는 것을 방지 (0.5배 ~ 5배 제한)
+      if (newScale < 0.5 || newScale > 5) return;
+
+      stage.scale({ x: newScale, y: newScale });
+      
+      // 마우스 중심점을 유지하면서 캔버스 위치 이동
+      const newPos = {
+        x: pointer.x - mousePointTo.x * newScale,
+        y: pointer.y - mousePointTo.y * newScale,
+      };
+      
+      stage.position(newPos);
+      stage.batchDraw();
     });
 
     return () => stage.destroy();
@@ -86,10 +123,16 @@
   }
 
   function handleClear() {
-    // drawingLayer 안의 모든 선을 파괴합니다.
-    drawingLayer.destroyChildren();
-    linesArray = [];
-    drawingLayer.batchDraw();
+    // ✨ [추가] 모두 지우기 전 확인(Confirm) 창 띄우기
+    if (confirm("캔버스를 정말 모두 지우시겠습니까?\n이 작업은 복구할 수 없습니다.")) {
+      drawingLayer.destroyChildren();
+      linesArray = [];
+      drawingLayer.batchDraw();
+      
+      // 지우고 나면 캔버스의 확대 비율과 위치도 원상복구 시킴 (옵션)
+      stage.scale({ x: 1, y: 1 });
+      stage.position({ x: 0, y: 0 });
+    }
   }
 
   function handleDownload() {
@@ -215,7 +258,15 @@
   .width-control { background: #f1f5f9; padding: 6px 16px; border-radius: 9999px; }
   .dot-icon { background-color: #475569; border-radius: 50%; display: inline-block; transition: all 0.1s; }
   .width-value { font-size: 13px; font-weight: 700; color: #475569; min-width: 32px; text-align: right; }
-  .modern-slider { -webkit-appearance: none; width: 100px; height: 6px; background: #cbd5e1; border-radius: 4px; outline: none; }
+  .modern-slider { 
+    -webkit-appearance: none; 
+    appearance: none; /* ✨ 이 줄을 추가하세요! */
+    width: 100px; 
+    height: 6px; 
+    background: #cbd5e1; 
+    border-radius: 4px; 
+    outline: none; 
+  }
   .modern-slider::-webkit-slider-thumb {
     -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%;
     background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); cursor: pointer; transition: transform 0.1s;

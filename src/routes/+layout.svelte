@@ -37,6 +37,11 @@
 </main>
 
 <style>
+:global(body), :global(button), :global(input) {
+  font-family: "Asta Sans", sans-serif;
+  font-optical-sizing: auto;
+  font-style: normal;
+}
   /* 헤더를 화면 상단에 고정하고 그림자를 줍니다. */
   .navbar {
     position: sticky;
