@@ -23,7 +23,7 @@ const config = {
 			"@/*": "./path/to/lib/*",
 		},
 		paths: {
-   		   base: process.argv.includes('dev') ? '' : '/svelte-konva'
+   		   base: process.argv.includes('dev') ? '' : '/konva'
    		}
 	}
 };
