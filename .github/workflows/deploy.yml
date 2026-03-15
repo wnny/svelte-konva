@@ -19,8 +19,16 @@ jobs:
   deploy:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url }}    
+    # ✨ 이 두 줄을 새로 추가해 주세요! (내부 동작을 Node 24로 강제 지정)
+    env: 
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
